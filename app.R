@@ -16,6 +16,7 @@ library(RColorBrewer)
 library(dplyr)
 library(sf)
 library(shinydashboard)
+library(spData)
 # world_data <- ggplot2::map_data('world')
 # world_data <- fortify(world_data)
 # head(world_data)
@@ -27,101 +28,97 @@ library(shinydashboard)
 #   geom_sf() +
 #   coord_sf(xlim = c(-25,50), ylim = c(35,70), expand = FALSE)
 
-country_data <- tribble(
-  ~Country, ~average_tt_length, ~random_number_yas,
- "Austria", 6, 0,
-  "Belgium", 5, 0,
- "Denmark", 6, 2,
-  "Finland", 8, 0,
- "France", NaN, 0,
-  "Germany", 5.5, 9,
-  "Ireland", 5, 0,
-  "Italy", 3, 0,
-  "Netherlands", 5.67, 0,
- "Portugal", 5, 7,
-  "Spain", 6, 3,
-  "Sweden", 6, 0,
-  "Switzerland", 6, 0,
- "United Kingdom", NaN, 0,
-  "United States of America", 5.7, 8,
-  "Canada", 5.1, 0
-)
-
 world_map = map_data("world")
 
-#print(world_map)
 
-# map_bounds <- world_map %>% 
-#   inner_join(country_data, by = join_by(region == Country)) #%>% 
-#   #st_transform(4326)
 
-#country_data$Country[country_data$Country == "USA"] <- "United States of America"
+#print(map_bounds)
 
+
+
+
+####### Length of TT Cleaned Load #########
+
+length_of_tt_data <- read.csv("CLEANED_ Length of Tenure Track - Sheet1.csv", stringsAsFactors=T)
+#print(length_of_tt_data)
+mapData <- world[c(2,11)]
 map_bounds <- rnaturalearth::ne_countries(returnclass = "sf") %>% 
-  inner_join(country_data, by = join_by(admin == Country))
+  inner_join(length_of_tt_data, by = join_by(admin == Country)) %>% 
+  st_transform(4326)
+print(length_of_tt_data)
 
-print(map_bounds)
+countries <- group_by(length_of_tt_data, Country) %>% 
+  summarise(avgRating = round(mean(Length.of.TT..years.),digits=2))
 
-  #left_join(country_data, by = join_by(region == Country)) #%>% st_transform(4326)
+countries <- left_join(countries, mapData, c("Country" = "name_long"))
 
-# ## map & data ##
-# Europe <- readOGR(dsn = "https://data.opendatasoft.com/explore/dataset/european-union-countries@public/download/?format=geojson&timezone=Europe/Berlin", 
-#                          layer = "OGRGeoJSON", 
-#                          stringsAsFactors = FALSE)
-# data <- data.frame("name" = c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia",
-#                               "Finland", "France", "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Latvia",
-#                               "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Norway", "Poland", "Portugal",
-#                               "Romania", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Turkey", "United Kingdom"),
-#                    "polcapita" = c(0.0087928207, 0.0100464969, 0.0075375536, 0.0049040898, 0.0097860082, 0.0119440135, 0.0087740252, 
-#                                    0.0080851042, 0.0063462331, 0.0064707328, 0.0107846429, 0.0085740997, 0.0059612600, 0.0409884683, 
-#                                    0.0138830047, 0.0067616652, 0.0049423915, 0.0053782730, 0.0053461017, 0.0165884166, 0.0046052235, 
-#                                    0.0116079951, 0.0052533159, 0.0100049243, 0.0075509189, 0.0047028415, 0.0067531703, 0.0077087169, 
-#                                    0.0064795469, 0.0008881585, 0.0053907055, 0.0053085690, 0.0069728195))
+print(countries)
 
-# mypalette <- colorNumeric( palette="viridis", domain=map_bounds$average_tt_length, na.color="transparent")
-# mypalette(c(45,43))
 
 bins <- c(2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, Inf)
-pal <- colorBin("YlOrRd", domain = map_bounds$average_tt_length, bins = bins)
+#pal <- colorBin("YlOrRd", domain = map_bounds$Length.of.TT..years, bins = bins)
+pal <- colorNumeric(palette = "YlOrRd", domain = countries$avgRating)
 
 ## create the UI ##
-ui = fluidPage(
+ui = fluidPage(class="page",
   
-  titlePanel("Academic Tenure Track Data"),
+  # CSS
+  tags$head(
+    tags$style(HTML("
+      body { background-color: ##a3bdee; }
+      .container-fluid { background-color: #fff; width: 1200px; padding: 30px; }
+      .title { text-align: center; },
+      .page { background-color: ##a3bdee; }
+      "))
+  ),
   
-  # Sidebar layout with input and output definitions
-  sidebarLayout(
-    
-    # Sidebar panel for inputs 
-    sidebarPanel(
-      
-      # First input: Type of data
-      selectInput(inputId = "Selector",
-                  label = "Choose the type of data you want to see:",
-                  choices = list("Length of Tenure Track by Country", 
-                                 "Random Number Yas"))
-      
-    ),
-    
+  h1("Academic Tenure Track Data", class = "title"),
+  
+  # # Sidebar layout with input and output definitions
+  # sidebarLayout(
+  #   
+  #   # Sidebar panel for inputs 
+  #   sidebarPanel(
+  #     
+  #     # First input: Type of data
+  #     selectInput(inputId = "Selector",
+  #                 label = "Choose the type of data you want to see:",
+  #                 choices = list("Length of Tenure Track by Country", 
+  #                                "Random Number Yas"))
+  #     
+  #   ),
+  
+  fluidRow(class = "toprow",
+           fluidRow (class = "filters",
+                     
+                     column(6,
+                            # Country menu
+                            selectInput("country", "Country", levels(length_of_tt_data$Country) %>% 
+                                          append("All") %>% # Add "All" option
+                                          sort()) # Sort options alphabetically
+                            
+                     )
+           ),
+
   # place the contents inside a box
-  fluidRow(
-    box(
-      width = 12, 
+  fluidRow(class = "mainrow",
       # separate the box by a column
-      # column(width = 2,
-      #        shiny::actionButton(inputId = "clearHighlight",
-      #                            icon = icon( name = "eraser"),
-      #                            label = "Clear the Map",
-      #                            style = "color: #fff; background-color: #D75453; border-color: #C73232")),
+      column(width = 6,
+             leaflet::leafletOutput(outputId = "myMap", height = 500)),
       
-      # separate the box by a column
-      column(width = 10, 
-             leaflet::leafletOutput(outputId = "myMap", height = 850)),
-      column(width = 5,
-             textOutput("selected_var"))
-    )
+      column(width = 6,
+        dataTableOutput(outputId = "table"))
+         
+  #,
+  # 
+  # fluidRow (class = "table",
+  #           # Table
+  #           dataTableOutput("table")
   )
+  
+  
 ))
+
 
 
 
@@ -130,24 +127,29 @@ server <- function( input, output, session ){
   # create foundational map
   foundational.map <- shiny::reactive({
     leaflet(map_bounds) %>% 
+      
       fitBounds(-20, 65, 20, 39) %>% 
       addProviderTiles(providers$CartoDB.Positron) %>% 
-      addPolygons(data = map_bounds, 
-                  layerId = map_bounds$admin, 
-                  fillColor = ~pal(average_tt_length),
+      addPolygons(data = countries$geom, 
+                  #layerId = map_bounds$admin, 
+                  # fillColor = ~pal(map_bounds),
+                  fillColor = pal(countries$avgRating),
                   color = "blue", 
                   group = "click.list",
                   weight = 2, 
-                  popup = paste("Country: ", map_bounds$admin, "<br>",
-                               "Average length of TT: ", map_bounds$average_tt_length, " years", "<br>"),
+                  popup = paste("Country: ", countries$Country, "<br>",
+                               "Average length of TT: ", countries$avgRating, " years", "<br>"
+                               ),
                   fillOpacity = 0.6, 
                   opacity = 1,
                   smoothFactor = 0.2) %>%
-      addLegend(pal = pal, values = map_bounds$average_tt_length, opacity = 0.7, title = NULL,
+      addLegend(pal = pal, values = map_bounds$Length.of.TT..years, opacity = 0.7, title = NULL,
                 position = "bottomright")
   })
 
-  output$myMap <- renderLeaflet({
+  output$myMap <- renderLeaflet({    
+    if (input$country != "All") {
+    length_of_tt_data <- filter(length_of_tt_data, Country == input$country)}
     foundational.map()
   }) 
 
@@ -181,6 +183,26 @@ server <- function( input, output, session ){
                   opacity = 1,
                   smoothFactor = 0.2)
   })
+  
+  output$table <- renderDataTable({
+    
+    # Filter data based on selected Country
+    if (input$country != "All") {
+      length_of_tt_data <- filter(length_of_tt_data, Country == input$country)
+    }
+    
+    # Hide table when user has filtered out all data
+    validate (
+      need(nrow(length_of_tt_data) > 0, "")
+    )
+    
+    length_of_tt_data[,2:3]
+    
+    
+  },
+    options = list(pageLength = 10)
+  )
+  
 #   # selected countries
 #   output$selected_var <- renderText({ 
 #     paste("You have selected", click.list$ids)
