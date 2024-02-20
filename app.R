@@ -17,47 +17,30 @@ library(dplyr)
 library(sf)
 library(shinydashboard)
 library(spData)
-# world_data <- ggplot2::map_data('world')
-# world_data <- fortify(world_data)
-# head(world_data)
-
-#world <- ne_countries(scale = "medium", returnclass = "sf")
-
-# Europe <- world[which(world$continent == "Europe"),]
-# ggplot(Europe) +
-#   geom_sf() +
-#   coord_sf(xlim = c(-25,50), ylim = c(35,70), expand = FALSE)
+library(readxl)
 
 world_map = map_data("world")
 
+####### Loading in the Data #########
+
+length_of_tt_data <- read.csv("Tenure Length and Tenure Clock - Sheet1.csv", stringsAsFactors=T)
+gender_tt_data <- read.csv("Tenure Gender Data - Gender Stats.csv", stringsAsFactors=T)
 
 
-#print(map_bounds)
-
-
-
-
-####### Length of TT Cleaned Load #########
-
-length_of_tt_data <- read.csv("CLEANED_ Length of Tenure Track - Sheet1.csv", stringsAsFactors=T)
-#print(length_of_tt_data)
+####### Loading the Map Data for Length of TT Data #########
 mapData <- world[c(2,11)]
 map_bounds <- rnaturalearth::ne_countries(returnclass = "sf") %>% 
   inner_join(length_of_tt_data, by = join_by(admin == Country)) %>% 
   st_transform(4326)
-print(length_of_tt_data)
 
 countries <- group_by(length_of_tt_data, Country) %>% 
-  summarise(avgRating = round(mean(Length.of.TT..years.),digits=2))
+  summarise(avgLength = round(mean(Length.of.TT..years.),digits=2))
 
 countries <- left_join(countries, mapData, c("Country" = "name_long"))
 
-print(countries)
-
 
 bins <- c(2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, Inf)
-#pal <- colorBin("YlOrRd", domain = map_bounds$Length.of.TT..years, bins = bins)
-pal <- colorNumeric(palette = "YlOrRd", domain = countries$avgRating)
+pal <- colorNumeric(palette = "YlOrRd", domain = countries$avgLength)
 
 ## create the UI ##
 ui = fluidPage(class="page",
@@ -73,20 +56,7 @@ ui = fluidPage(class="page",
   ),
   
   h1("Academic Tenure Track Data", class = "title"),
-  
-  # # Sidebar layout with input and output definitions
-  # sidebarLayout(
-  #   
-  #   # Sidebar panel for inputs 
-  #   sidebarPanel(
-  #     
-  #     # First input: Type of data
-  #     selectInput(inputId = "Selector",
-  #                 label = "Choose the type of data you want to see:",
-  #                 choices = list("Length of Tenure Track by Country", 
-  #                                "Random Number Yas"))
-  #     
-  #   ),
+
   
   fluidRow(class = "toprow",
            fluidRow (class = "filters",
@@ -97,7 +67,15 @@ ui = fluidPage(class="page",
                                           append("All") %>% # Add "All" option
                                           sort()) # Sort options alphabetically
                             
-                     )
+                     ),
+                     column(6,
+                            # Data Type menu
+                            selectInput("data_type", "Data Type", c("Length of Tenure Track", "Gender Statistics") %>% 
+                                          append("All") %>% # Add "All" option
+                                          sort()) # Sort options alphabetically
+                            
+                     ),
+                     
            ),
 
   # place the contents inside a box
@@ -109,22 +87,13 @@ ui = fluidPage(class="page",
       column(width = 6,
         dataTableOutput(outputId = "table"))
          
-  #,
-  # 
-  # fluidRow (class = "table",
-  #           # Table
-  #           dataTableOutput("table")
   )
   
   
 ))
 
-
-
-
 ## create the server ##
 server <- function( input, output, session ){
-  # create foundational map
   foundational.map <- shiny::reactive({
     leaflet(map_bounds) %>% 
       
@@ -133,12 +102,12 @@ server <- function( input, output, session ){
       addPolygons(data = countries$geom, 
                   #layerId = map_bounds$admin, 
                   # fillColor = ~pal(map_bounds),
-                  fillColor = pal(countries$avgRating),
+                  fillColor = pal(countries$avgLength),
                   color = "blue", 
                   group = "click.list",
                   weight = 2, 
                   popup = paste("Country: ", countries$Country, "<br>",
-                               "Average length of TT: ", countries$avgRating, " years", "<br>"
+                               "Average length of TT: ", countries$avgLength, " years", "<br>"
                                ),
                   fillOpacity = 0.6, 
                   opacity = 1,
@@ -153,37 +122,31 @@ server <- function( input, output, session ){
     foundational.map()
   }) 
 
-  # Clear the map button
-  shiny::observeEvent( input$clearHighlight, { 
-    output$myMap <- leaflet::renderLeaflet({
-      click.list$ids <- NULL
-      foundational.map()
-    }) 
-  })
   
-  shiny::observeEvent(input$Selector, {
-    if(input$Selector == "Length of Tenure Track by Country"){
-      choice = map_bounds$average_tt_length
-      additional_text = " years"
-    }
-    else{
-      choice = map_bounds$random_number_yas
-      additional_text = " randoms"
-    }
-    leafletProxy("myMap") %>%
-      addPolygons(data = map_bounds, 
-                  layerId = map_bounds$admin, 
-                  fillColor = ~pal(choice),
-                  color = "blue", 
-                  group = "click.list",
-                  weight = 2, 
-                  popup = paste("Country: ", map_bounds$admin, "<br>",
-                                input$Selector,":", choice, additional_text, "<br>"),
-                  fillOpacity = 0.6, 
-                  opacity = 1,
-                  smoothFactor = 0.2)
-  })
+  # shiny::observeEvent(input$Selector, {
+  #   if(input$Selector == "Length of Tenure Track by Country"){
+  #     choice = map_bounds$average_tt_length
+  #     additional_text = " years"
+  #   }
+  #   else{
+  #     choice = map_bounds$random_number_yas
+  #     additional_text = " randoms"
+  #   }
+  #   leafletProxy("myMap") %>%
+  #     addPolygons(data = map_bounds, 
+  #                 layerId = map_bounds$admin, 
+  #                 fillColor = ~pal(choice),
+  #                 color = "blue", 
+  #                 group = "click.list",
+  #                 weight = 2, 
+  #                 popup = paste("Country: ", map_bounds$admin, "<br>",
+  #                               input$Selector,":", choice, additional_text, "<br>"),
+  #                 fillOpacity = 0.6, 
+  #                 opacity = 1,
+  #                 smoothFactor = 0.2)
+  # })
   
+  #Display Data Table
   output$table <- renderDataTable({
     
     # Filter data based on selected Country
@@ -198,15 +161,10 @@ server <- function( input, output, session ){
     
     length_of_tt_data[,2:3]
     
-    
   },
     options = list(pageLength = 10)
   )
   
-#   # selected countries
-#   output$selected_var <- renderText({ 
-#     paste("You have selected", click.list$ids)
-#   })
 }
 
 
