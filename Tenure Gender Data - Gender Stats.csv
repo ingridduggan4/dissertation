@@ -1,10 +1,10 @@
-Country,Year,Women at Full Professor Level %,Women at Associate Professor Level %,Women at Assistant Professor Level %
-United States,2023,36,,
-Canada,2019,28,44,50
-Finland (University of Helsinki),,36,,
-Ireland,2015,27.7,37.3,41.2
-Denmark,2017,22,33,40
-Austria,2015,23,24,46
-Netherlands,2022,28,34,
-Italy,2018,23.7,38.4,46.7
-Switzerland (UZH),2017,21,,29
+Country,Year,Women at Full Professor Level %,Women at Associate Professor Level %,Women at Assistant Professor Level %,Comment
+United States,2023,36,,,
+Canada,2019,28,44,50,
+Finland,2023,36,,,This data is for the University of Helsinki
+Ireland,2015,27.7,37.3,41.2,
+Denmark,2017,22,33,40,
+Austria,2015,23,24,46,
+Netherlands,2022,28,34,,
+Italy,2018,23.7,38.4,46.7,
+Switzerland (UZH),2017,21,,29,
