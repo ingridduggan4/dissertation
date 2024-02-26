@@ -18,13 +18,17 @@ library(sf)
 library(shinydashboard)
 library(spData)
 library(readxl)
+library(tidyr)
+library(bslib)
+library(shinythemes)
+
 
 world_map = map_data("world")
 
 ####### Loading in the Data #########
 length_of_tt_data <- read.csv("Tenure Length and Tenure Clock - Sheet1.csv", stringsAsFactors=T)
 gender_tt_data <- read.csv("Tenure Gender Data - Gender Stats.csv", stringsAsFactors=T)
-
+str(gender_tt_data)
 
 ####### Loading the Map Data for Length of TT Data #########
 mapData <- world[c(2,11)]
@@ -46,7 +50,6 @@ gender_map_bounds <- rnaturalearth::ne_countries(returnclass = "sf") %>%
 gender_countries <- group_by(gender_tt_data, Country)
 
 gender_countries <- left_join(gender_countries, mapData, c("Country" = "name_long"))
-print(gender_countries)
 
 
 ##### Colour Palettes #####
@@ -55,16 +58,34 @@ gender_pal <- colorNumeric(palette = "RdPu", domain = gender_map_bounds$Women.at
 
 ##### creating the UI #####
 ui = fluidPage(class="page",
+               theme = shinytheme("superhero"),
+  # # CSS
+  # tags$head(
+  #   tags$style(HTML("
+  #     body { background-color: #f2efe9; }
+  #     .container-fluid { background-color: #fff; width: 1500px; padding: 40px; }
+  #     .title { text-align: center; font-family: arial black, sans serif;}
+  #     .toprow { margin: 60px 0px; padding: 30px; background-color: #8080ff; }
+  #     .mainrow {margin: 60px 0px; padding: 30px; background-color: #ffffff; }
+  #     .filters { margin: 0px auto; }
+  #     .shiny-input-container { width:100% !important; }
+  #     .table { padding: 30px;}
+  #     .bar { margin: 60px 0px; padding: 30px; background-color: #ffffff; }
+  #     .leaflet-top { z-index:999 !important; }
+  # 
+  #     "))
+  # ),
   
-  # CSS
-  tags$head(
-    tags$style(HTML("
-      body { background-color: ##a3bdee; }
-      .container-fluid { background-color: #fff; width: 1200px; padding: 30px; }
-      .title { text-align: center; },
-      .page { background-color: ##a3bdee; }
-      "))
-  ),
+   # CSS
+   tags$head(
+     tags$style(HTML("
+     .container-fluid {width: 1500px; padding: 40px; padding: 40px;}
+     .title { text-align: center; font-family: arial black, sans serif;}
+     .bar {background-color: #2b3e50}
+     .divider {height: 100px}
+        "))
+      ),
+  
   
   h1("Academic Tenure Track Data", class = "title"),
 
@@ -82,7 +103,6 @@ ui = fluidPage(class="page",
                      column(6,
                             # Data Type menu
                             selectInput("data_type", "Data Type", c("Length of Tenure Track", "Gender Statistics") %>%
-                                          append("All") %>% # Add "All" option
                                           sort()) # Sort options alphabetically
 
                      ),
@@ -90,96 +110,31 @@ ui = fluidPage(class="page",
 
 
            ),
+           
+           
+    fluidRow(class = "mainrow",
+             # separate the box by a column
+              column(width = 6,
+                  leaflet::leafletOutput(outputId = "myMap", height = 500)),
+                    column(width = 6,
+                           dataTableOutput(outputId = "table")),
+             
+    fluidRow(class="divider", column(width=12)),
 
-
-  # place the contents inside a box
-  fluidRow(class = "mainrow",
-      # separate the box by a column
-      column(width = 6,
-             leaflet::leafletOutput(outputId = "myMap", height = 500)),
-      
-      column(width = 6,
-        dataTableOutput(outputId = "table"))
+    # place the contents inside a box
+    fluidRow(class = "bar",
+            
+             column(width=12,
+             # Bar Chart
+             plotOutput("barChart"))
+  
          
+  )
+
+           
   )
   
 ))
-
-## THIS IS A WORKING SERVER: ONLY DELETE WHEN OTHER IS FULLY WORKING ##
-# server <- function( input, output, session ){
-#   foundational.map <- shiny::reactive({
-#     leaflet(map_bounds) %>% 
-#       
-#       fitBounds(-20, 65, 20, 39) %>% 
-#       addProviderTiles(providers$CartoDB.Positron) %>% 
-#       addPolygons(data = countries$geom, 
-#                   #layerId = map_bounds$admin, 
-#                   # fillColor = ~pal(map_bounds),
-#                   fillColor = pal(countries$avgLength),
-#                   color = "blue", 
-#                   group = "click.list",
-#                   weight = 2, 
-#                   popup = paste("Country: ", countries$Country, "<br>",
-#                                "Average length of TT: ", countries$avgLength, " years", "<br>"
-#                                ),
-#                   fillOpacity = 0.6, 
-#                   opacity = 1,
-#                   smoothFactor = 0.2) %>%
-#       addLegend(pal = pal, values = map_bounds$Length.of.TT..years, opacity = 0.7, title = NULL,
-#                 position = "bottomright")
-#   })
-# 
-#   output$myMap <- renderLeaflet({    
-#     if (input$country != "All") {
-#     length_of_tt_data <- filter(length_of_tt_data, Country == input$country)}
-#     foundational.map()
-#   }) 
-# 
-#   
-#   # shiny::observeEvent(input$Selector, {
-#   #   if(input$Selector == "Length of Tenure Track by Country"){
-#   #     choice = map_bounds$average_tt_length
-#   #     additional_text = " years"
-#   #   }
-#   #   else{
-#   #     choice = map_bounds$random_number_yas
-#   #     additional_text = " randoms"
-#   #   }
-#   #   leafletProxy("myMap") %>%
-#   #     addPolygons(data = map_bounds, 
-#   #                 layerId = map_bounds$admin, 
-#   #                 fillColor = ~pal(choice),
-#   #                 color = "blue", 
-#   #                 group = "click.list",
-#   #                 weight = 2, 
-#   #                 popup = paste("Country: ", map_bounds$admin, "<br>",
-#   #                               input$Selector,":", choice, additional_text, "<br>"),
-#   #                 fillOpacity = 0.6, 
-#   #                 opacity = 1,
-#   #                 smoothFactor = 0.2)
-#   # })
-#   
-#   #Display Data Table
-#   output$table <- renderDataTable({
-#     
-#     # Filter data based on selected Country
-#     if (input$country != "All") {
-#       length_of_tt_data <- filter(length_of_tt_data, Country == input$country)
-#     }
-#     
-#     # Hide table when user has filtered out all data
-#     validate (
-#       need(nrow(length_of_tt_data) > 0, "")
-#     )
-#     
-#     length_of_tt_data[,2:3]
-#     
-#   },
-#     options = list(pageLength = 10)
-#   )
-#   
-# }
-
 
 #################################################################################################################
 
@@ -187,17 +142,14 @@ ui = fluidPage(class="page",
 
 server <- function( input, output, session ){
   
-  # selection <- shiny::reactive({
-  #   input$data_type
-  # })
-  # 
-  # print(selection)
-  
-  #if(selection != "Length of Tenure Track"){
+  initial_lat = 60
+  initial_lng = -30
+  initial_zoom = 2.3
+
     foundational.gender.map <- shiny::reactive({
       leaflet(gender_map_bounds) %>% 
-        
-        fitBounds(-20, 65, 20, 39) %>% 
+        fitBounds(-20, 65, 20, 39) %>%
+        setView(lat = initial_lat, lng = initial_lng, zoom = initial_zoom) %>%
         addProviderTiles(providers$CartoDB.Positron) %>% 
         addPolygons(data = gender_countries$geom, 
                     #layerId = map_bounds$admin, 
@@ -219,8 +171,8 @@ server <- function( input, output, session ){
     #else{
       foundational.length.map <- shiny::reactive({
         leaflet(map_bounds) %>% 
-          
-          fitBounds(-20, 65, 20, 39) %>% 
+          fitBounds(-20, 65, 20, 39) %>%
+          setView(lat = initial_lat, lng = initial_lng, zoom = initial_zoom) %>%
           addProviderTiles(providers$CartoDB.Positron) %>% 
           addPolygons(data = countries$geom, 
                       #layerId = map_bounds$admin, 
@@ -254,28 +206,40 @@ server <- function( input, output, session ){
   }) 
   
   
-  # shiny::observeEvent(input$Selector, {
-  #    if(input$Selector == "Length of Tenure Track by Country"){
-  #      choice = map_bounds$average_tt_length
-  #      additional_text = " years"
-  #    }
-  #  else{
-  #      choice = map_bounds$random_number_yas
-  #      additional_text = " randoms"
-  #    }
-  #    leafletProxy("myMap") %>%
-  #      addPolygons(data = map_bounds, 
-  #                  layerId = map_bounds$admin, 
-  #                  fillColor = ~pal(choice),
-  #                  color = "blue", 
-  #                  group = "click.list",
-  #                  weight = 2, 
-  #                  popup = paste("Country: ", map_bounds$admin, "<br>",
-  #                                input$Selector,":", choice, additional_text, "<br>"),
-  #                  fillOpacity = 0.6, 
-  #                  opacity = 1,
-  #                  smoothFactor = 0.2)
-  #  })
+  # Create bar chart of brands
+  output$barChart <- renderPlot({
+    if(input$data_type == "Gender Statistics"){
+      if (input$country != "All") {
+        gender_tt_data <- filter(gender_tt_data, Country == input$country)
+        validate (need(nrow(gender_tt_data) > 0, "No data available"))
+        }
+        
+          gender_tt_data %>% 
+          select(everything())%>%
+            pivot_longer(.,
+                         cols=c(Women.at.Full.Professor.Level..,
+                                Women.at.Associate.Professor.Level..,
+                                Women.at.Assistant.Professor.Level..),
+                         names_to="Var",
+                         values_to="Val") %>%
+          ggplot(aes(y=Val,x=Country,fill=Var))+
+          geom_bar(stat="identity", position="dodge")+
+          scale_fill_brewer(palette = "Blues") + 
+          scale_fill_discrete(name = "Legend", 
+                              labels = c("Women at Assistant Professor Level", 
+                                         "Women at Associate Professor Level", 
+                                         "Women at Full Professor Level")) + 
+          xlab("Country") + 
+          ylab("%") 
+        
+          
+     
+      
+      
+    }
+    
+  },bg = "#313D52")
+
   
   #Display Data Table
   output$table <- renderDataTable({
@@ -287,14 +251,14 @@ server <- function( input, output, session ){
       validate (
         need(nrow(gender_tt_data) > 0, "")
       )
-      gender_tt_data[,1:5]
+      gender_tt_data[,1:3]
     }
     else{
       if (input$country != "All") {
         length_of_tt_data <- filter(length_of_tt_data, Country == input$country)
       }
       validate (
-        need(nrow(length_of_tt_data) > 0, "")
+        need(nrow(length_of_tt_data) > 0, "No data available")
       )
       length_of_tt_data[,2:3]
     }
