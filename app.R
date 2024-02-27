@@ -28,7 +28,7 @@ world_map = map_data("world")
 ####### Loading in the Data #########
 length_of_tt_data <- read.csv("Tenure Length and Tenure Clock - Sheet1.csv", stringsAsFactors=T)
 gender_tt_data <- read.csv("Tenure Gender Data - Gender Stats.csv", stringsAsFactors=T)
-str(gender_tt_data)
+contract_data <- read.csv("Permanent vs Temp Contracts - Data.csv", stringsAsFactors=T)
 
 ####### Loading the Map Data for Length of TT Data #########
 mapData <- world[c(2,11)]
@@ -48,33 +48,27 @@ gender_map_bounds <- rnaturalearth::ne_countries(returnclass = "sf") %>%
   st_transform(4326)
 
 gender_countries <- group_by(gender_tt_data, Country)
-
 gender_countries <- left_join(gender_countries, mapData, c("Country" = "name_long"))
+
+
+####### Loading the Map Data for Contracts Data #########
+contract_map_bounds <- rnaturalearth::ne_countries(returnclass = "sf") %>% 
+  inner_join(contract_data, by = join_by(admin == Country)) %>% 
+  st_transform(4326)
+
+contract_countries <- group_by(contract_data, Country)
+contract_countries <- left_join(contract_countries, mapData, c("Country" = "name_long"))
 
 
 ##### Colour Palettes #####
 tt_length_pal <- colorNumeric(palette = "YlOrRd", domain = countries$avgLength)
 gender_pal <- colorNumeric(palette = "RdPu", domain = gender_map_bounds$Women.at.Full.Professor.Level)
+contract_pal <- colorNumeric(palette = "Reds", domain = contract_map_bounds$Fixed.Term.Contingent.Contracts)
+contract_pal <- colorBin("Blues", contract_map_bounds$Fixed.Term.Contingent.Contracts, 12, pretty = FALSE)
 
 ##### creating the UI #####
 ui = fluidPage(class="page",
                theme = shinytheme("superhero"),
-  # # CSS
-  # tags$head(
-  #   tags$style(HTML("
-  #     body { background-color: #f2efe9; }
-  #     .container-fluid { background-color: #fff; width: 1500px; padding: 40px; }
-  #     .title { text-align: center; font-family: arial black, sans serif;}
-  #     .toprow { margin: 60px 0px; padding: 30px; background-color: #8080ff; }
-  #     .mainrow {margin: 60px 0px; padding: 30px; background-color: #ffffff; }
-  #     .filters { margin: 0px auto; }
-  #     .shiny-input-container { width:100% !important; }
-  #     .table { padding: 30px;}
-  #     .bar { margin: 60px 0px; padding: 30px; background-color: #ffffff; }
-  #     .leaflet-top { z-index:999 !important; }
-  # 
-  #     "))
-  # ),
   
    # CSS
    tags$head(
@@ -82,7 +76,6 @@ ui = fluidPage(class="page",
      .container-fluid {width: 1500px; padding: 40px; padding: 40px;}
      .title { text-align: center; font-family: arial black, sans serif;}
      .bar {background-color: #2b3e50}
-     .divider {height: 100px}
         "))
       ),
   
@@ -102,7 +95,9 @@ ui = fluidPage(class="page",
                      ),
                      column(6,
                             # Data Type menu
-                            selectInput("data_type", "Data Type", c("Length of Tenure Track", "Gender Statistics") %>%
+                            selectInput("data_type", "Data Type", c("Length of Tenure Track", 
+                                                                    "Gender Statistics",
+                                                                    "Contract Type") %>%
                                           sort()) # Sort options alphabetically
 
                      ),
@@ -119,14 +114,13 @@ ui = fluidPage(class="page",
                     column(width = 6,
                            dataTableOutput(outputId = "table")),
              
-    fluidRow(class="divider", column(width=12)),
 
     # place the contents inside a box
     fluidRow(class = "bar",
             
              column(width=12,
              # Bar Chart
-             plotOutput("barChart"))
+             plotOutput("barChart"), style='padding: 20px;')
   
          
   )
@@ -142,33 +136,54 @@ ui = fluidPage(class="page",
 
 server <- function( input, output, session ){
   
+  #setting initial zoom for the map output
   initial_lat = 60
   initial_lng = -30
   initial_zoom = 2.3
-
-    foundational.gender.map <- shiny::reactive({
-      leaflet(gender_map_bounds) %>% 
-        fitBounds(-20, 65, 20, 39) %>%
-        setView(lat = initial_lat, lng = initial_lng, zoom = initial_zoom) %>%
-        addProviderTiles(providers$CartoDB.Positron) %>% 
-        addPolygons(data = gender_countries$geom, 
-                    #layerId = map_bounds$admin, 
-                    # fillColor = ~pal(map_bounds),
-                    fillColor = gender_pal(gender_tt_data$Women.at.Full.Professor.Level),
-                    color = "blue", 
-                    group = "click.list",
-                    weight = 2, 
-                    popup = paste("Country: ", gender_countries$Country, "<br>",
-                                  "Women at Full Professor Level: ", gender_tt_data$Women.at.Full.Professor.Level, "%", "<br>"
-                    ),
-                    fillOpacity = 0.6, 
-                    opacity = 1,
-                    smoothFactor = 0.2) %>%
-        addLegend(pal = gender_pal, values = gender_map_bounds$Women.at.Full.Professor.Level, opacity = 0.7, title = NULL,
-                  position = "bottomright")
-    })
-    #}
-    #else{
+  
+  
+  output$myMap <- renderLeaflet({  
+    
+    if(input$data_type == "Gender Statistics"){
+      
+      if (input$country != "All") {
+        gender_tt_data <- filter(gender_tt_data, Country == input$country)
+        gender_countries <- filter(gender_countries, Country == input$country)
+        gender_map_bounds <- filter(gender_map_bounds, admin == input$country)}
+      
+      foundational.gender.map <- shiny::reactive({
+        leaflet(gender_map_bounds) %>% 
+          fitBounds(-20, 65, 20, 39) %>%
+          setView(lat = initial_lat, lng = initial_lng, zoom = initial_zoom) %>%
+          addProviderTiles(providers$CartoDB.Positron) %>% 
+          addPolygons(data = gender_countries$geom, 
+                      #layerId = map_bounds$admin, 
+                      # fillColor = ~pal(map_bounds),
+                      fillColor = gender_pal(gender_tt_data$Women.at.Full.Professor.Level),
+                      color = "blue", 
+                      group = "click.list",
+                      weight = 2, 
+                      popup = paste("Country: ", gender_countries$Country, "<br>",
+                                    "Women at Full Professor Level: ", gender_tt_data$Women.at.Full.Professor.Level, "%", "<br>"
+                      ),
+                      fillOpacity = 0.6, 
+                      opacity = 1,
+                      smoothFactor = 0.2) %>%
+          addLegend(pal = gender_pal, values = gender_map_bounds$Women.at.Full.Professor.Level, opacity = 0.7, title = NULL,
+                    position = "bottomright")
+      })
+      
+      foundational.gender.map()
+    }
+    
+    
+    else if(input$data_type == "Length of Tenure Track"){
+      
+      if (input$country != "All") {
+        length_of_tt_data <- filter(length_of_tt_data, Country == input$country)
+        countries <- filter(countries, Country == input$country)
+        map_bounds <- filter(map_bounds, admin == input$country)}
+      
       foundational.length.map <- shiny::reactive({
         leaflet(map_bounds) %>% 
           fitBounds(-20, 65, 20, 39) %>%
@@ -190,28 +205,48 @@ server <- function( input, output, session ){
           addLegend(pal = tt_length_pal, values = map_bounds$Length.of.TT..years, opacity = 0.7, title = NULL,
                     position = "bottomright")
       })
-    #}
-  
-  
-  output$myMap <- renderLeaflet({    
-    if (input$country != "All") {
-      length_of_tt_data <- filter(length_of_tt_data, Country == input$country)}
-    if(input$data_type == "Gender Statistics"){
-      foundational.gender.map()
-    }
-    else{
+      
       foundational.length.map()
     }
-    #foundational.map()
+    
+    else{
+      if (input$country != "All") {
+        contract_countries <- filter(contract_countries, Country == input$country)
+        contract_data <- filter(contract_data, Country == input$country)
+        contract_map_bounds <- filter(contract_map_bounds, admin == input$country)}
+
+      foundational.contract.map <- shiny::reactive({
+        leaflet(contract_map_bounds) %>%
+          fitBounds(-20, 65, 20, 39) %>%
+          setView(lat = initial_lat, lng = initial_lng, zoom = initial_zoom) %>%
+          addProviderTiles(providers$CartoDB.Positron) %>%
+          addPolygons(data = contract_countries$geom,
+                      fillColor = contract_pal(contract_data$Fixed.Term.Contingent.Contracts),
+                      color = "blue",
+                      group = "click.list",
+                      weight = 2,
+                      popup = paste("Country: ", contract_countries$Country, "<br>",
+                                    "Percentage of academic staff on temporary contracts: ",
+                                    contract_data$Fixed.Term.Contingent.Contracts, "%", "<br>"
+                      ),
+                      fillOpacity = 0.6,
+                      opacity = 1,
+                      smoothFactor = 0.2) %>%
+          addLegend(pal = contract_pal, values = contract_map_bounds$Fixed.Term.Contingent.Contracts,
+                    opacity = 0.7, title = NULL, position = "bottomright")
+      })
+      
+      foundational.contract.map()
+    }
   }) 
   
   
-  # Create bar chart of brands
+  # Create bar chart
   output$barChart <- renderPlot({
     if(input$data_type == "Gender Statistics"){
       if (input$country != "All") {
         gender_tt_data <- filter(gender_tt_data, Country == input$country)
-        validate (need(nrow(gender_tt_data) > 0, "No data available"))
+        validate (need(nrow(gender_tt_data) > 0, "No data available with current filters"))
         }
         
           gender_tt_data %>% 
@@ -229,6 +264,7 @@ server <- function( input, output, session ){
                               labels = c("Women at Assistant Professor Level", 
                                          "Women at Associate Professor Level", 
                                          "Women at Full Professor Level")) + 
+          scale_fill_manual(values=c("#54396D", "#8A5CB3", "#B574EE"))+
           xlab("Country") + 
           ylab("%") 
         
@@ -253,14 +289,23 @@ server <- function( input, output, session ){
       )
       gender_tt_data[,1:3]
     }
-    else{
+    else if(input$data_type == "Length of Tenure Track"){
       if (input$country != "All") {
         length_of_tt_data <- filter(length_of_tt_data, Country == input$country)
       }
       validate (
-        need(nrow(length_of_tt_data) > 0, "No data available")
+        need(nrow(length_of_tt_data) > 0, "No data available with current filters")
       )
       length_of_tt_data[,2:3]
+    }
+    else{
+      if (input$country != "All") {
+        contract_data <- filter(contract_data, Country == input$country)
+      }
+      validate (
+        need(nrow(contract_data) > 0, "No data available with current filters")
+      )
+      contract_data[,1:6]
     }
     
   },
