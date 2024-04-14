@@ -1,0 +1,12 @@
+name: Academic-Tenure-Track-Explorer
+title: Academic-Tenure-Track-Explorer
+username: ingridduggan
+account: ingridduggan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 11362927
+bundleId: 8493300
+url: https://ingridduggan.shinyapps.io/Academic-Tenure-Track-Explorer/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
